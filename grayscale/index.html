@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Grayscale Bitcoin Shares History</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+  <!-- Load required Bootstrap and BootstrapVue CSS -->
+  <link type="text/css" rel="stylesheet" href="https://unpkg.com/bootstrap/dist/css/bootstrap.min.css" />
+  <link type="text/css" rel="stylesheet" href="https://unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue.min.css" />
+
+  <!-- Load polyfills to support older browsers -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es2015%2CIntersectionObserver" crossorigin="anonymous"></script>
+
+  <!-- Load Vue followed by BootstrapVue -->
+  <script src="https://unpkg.com/vue@latest/dist/vue.min.js"></script>
+  <script src="https://unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue.min.js"></script>
+</head>
+
+<body>
+  <div id="title-app">
+    <h2 v-if="isLoading">Loading...</h2>
+    <h2 v-if="!isLoading">Grayscale Bitcoin Shares History</h2>
+  </div>
+
+  <div id="table-app">
+    <b-table striped hover responsive :items="entries" :fields="fields"></b-table>
+  </div>
+
+
+  <script>
+    class GrayscaleEntry {
+
+      bitcoins
+      diff
+
+      constructor(date, shares, btcPerShare) {
+        this.date = date
+        this.shares = shares
+        this.btcPerShare = btcPerShare
+      }
+    }
+
+
+    const xmlHttp = new XMLHttpRequest()
+    xmlHttp.open('GET', 'https://raw.githubusercontent.com/bofavom/grayscale_bitcoin_shares/master/grayscale_bitcoin.csv', true)
+
+    xmlHttp.onreadystatechange = function(event) {
+      if (xmlHttp.readyState == 4 && xmlHttp.status == 200) {
+        const plainCsv = xmlHttp.responseText
+        buildEntriesFromCsv(plainCsv)
+      }
+    }
+
+    xmlHttp.send()
+    
+
+    function buildEntriesFromCsv(plainCsv) {
+      const lines = plainCsv.split('\n')
+      lines.shift()
+
+      const entries = []
+
+      for (line of lines) {
+        const values = line.split(',')
+        if (values.length >= 3) {
+          const entry = new GrayscaleEntry(values[0], values[1], values[2])
+          entries.push(entry)
+        }
+      }
+
+      entries.sort()
+
+      for (entry of entries) {
+        const index = entries.indexOf(entry)
+        const bitcoins = (parseFloat(entry.shares) * parseFloat(entry.btcPerShare)).toFixed(8)
+        entries[index].bitcoins = bitcoins
+        
+        if (index > 0) {
+          entries[index].diff = (bitcoins - entries[index - 1].bitcoins).toFixed(8)
+        }
+      }
+
+      entries.reverse()
+      setTableEntries(entries)
+    }
+    
+    function setTableEntries(entries) {
+      tableApp.entries = entries
+      titleApp.isLoading = false
+    }
+
+    const titleApp = new Vue({
+      el: '#title-app',
+      data: {
+        isLoading: true
+      }
+    })
+
+    const tableApp = new Vue({
+      el: '#table-app',
+      data: {
+        entries: [],
+        fields: [
+          { key: 'date', sortable: true },
+          { key: 'shares', label: 'Shares Outstanding', sortable: true },
+          { key: 'btcPerShare', label: 'Bitcoin per Share', sortable: true },
+          { key: 'bitcoins', sortable: true },
+          { key: 'diff', sortable: true }
+        ]
+      }
+    })
+  </script>
+</body>
+</html>
